@@ -11,6 +11,7 @@ class App {
     };
 
     this.midi = null;
+    this.output = null;
   }
   
   /**
@@ -22,7 +23,8 @@ class App {
       console.log(this.midi);
       // If success, start MIDI loop
       if (this.midi) {
-        this.initMIDILoop();
+        this.initInputMIDILoop();
+        this.initOutputMIDI();
       }
     } catch (e) {
       this.error(e);
@@ -37,7 +39,7 @@ class App {
       if (!navigator.requestMIDIAccess) {
         throw new Error('No MIDI support in browser!');
       }
-      return await navigator.requestMIDIAccess();
+      return await navigator.requestMIDIAccess({ sysex: true });
     } catch (e) {
       throw e;
     }
@@ -46,17 +48,33 @@ class App {
   /**
    * Init MIDI loop and assign handler for messages.
    */
-  initMIDILoop () {
+  initInputMIDILoop () {
     try {
       const inputs = this.midi.inputs.values();
-      // const outputs = midi.outputs.values();
 
       for (let input = inputs.next();
           input && !input.done;
           input = inputs.next()) {
         input.value.onmidimessage = (message) => {
-          this.onMIDIMessage(message);
+          try {
+            this.onMIDIMessage(message);
+          } catch (e) {
+            this.error(e);
+          }
         };
+      }
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  initOutputMIDI () {
+    try {
+      const outputs = this.midi.outputs.values();
+
+      for (const output of outputs) {
+        this.output = output;
+        console.log(output);
       }
     } catch (e) {
       throw e;
@@ -65,6 +83,7 @@ class App {
 
   /**
    * Handler for MIDI messages.
+   * @param {MIDIMessageEvent} message Midi message object
    */
   onMIDIMessage (message) {
     // Parse MIDI message data
@@ -87,7 +106,7 @@ class App {
 
       // Unknown command
       default:
-        this.error(new Error('Unknown MIDI input command: ', command, e));
+        throw new Error('Unknown MIDI input command: ', command);
     }
   }
 
@@ -99,6 +118,49 @@ class App {
     this.dom.tone.innerHTML = 'Note OFF: ' + parseInt(note);
   }
 
+  setColor (button, color) {
+    if (!this.output) {
+      this.error(new Error("MIDI output not initialized"));
+      return;
+    }
+
+    // Command, note, velocity
+    this.output.send([144, button, color])
+  }
+
+  async blink (button, color, n, interval) {
+    for (let i = 0; i < n; i++) {
+      this.setColor(button, color);
+      await sleep(interval);
+      this.setColor(button, LP.COLOR.BLACK);
+      await sleep(interval);
+    }
+  }
+  
+  doSequence () {
+    // this.blink(LP.BUTTON.SIDE_0, LP.COLOR.GREEN, 10, 1000);
+    // this.blink(LP.BUTTON.SIDE_1, LP.COLOR.GREEN, 10, 1000);
+    // this.setColor(LP.BUTTON.SIDE_1, LP.COLOR.BLACK);
+    // this.output.send([176, 0, 127]);
+    // this.setColor(0x08, LP.COLOR.BLACK);
+    
+    this.marquee(":)", LP.COLOR.RED);
+  }
+
+  marquee (text, color) {
+    // Convert string to byte-array
+    const byteArr = [];
+    for (let i = 0; i < text.length; i++) {
+      byteArr.push(text.charCodeAt(i));
+    }
+
+    this.output.send([0xf0, 0x00, 0x20, 0x29, 0x09, color,...byteArr, 0xF7]);
+  }
+
+  reset () {
+    this.output.send([176, 0, 0]);
+  }
+  
   /**
    * Handle an error in a nice way :)
    */
@@ -113,6 +175,7 @@ class App {
     // Start the app
     const app = new App();
     await app.initMIDI();
+    app.doSequence();
   } catch (e) { 
     console.log("YOU'RE FUCKED!", e);
   }
