@@ -1,33 +1,73 @@
-const tone = document.getElementById("tone");
 
-if (navigator.requestMIDIAccess) {
-  console.log('Browser supports MIDI!');
-}
+class App {
 
-if (navigator.requestMIDIAccess) {
-  navigator.requestMIDIAccess()
-    .then(success, failure);
-}
+  /**
+   * Init application.
+   */
+  constructor () {
+    // Setup DOM elements
+    this.dom = {
+      tone: document.getElementById('tone')
+    };
 
-function success (midi) {
-  var inputs = midi.inputs.values();
-  // var outputs = midi.outputs.values();
+    // Setup MIDI object
+    const midi = this.initMIDIAccess();
 
-  for (var input = inputs.next();
-    input && !input.done;
-    input = inputs.next()) {
-
-    input.value.onmidimessage = onMIDIMessage;
+    // Iff success, start MIDI loop
+    if (midi) {
+      this.initMIDILoop(midi);
+    }
   }
-  function onMIDIMessage (message) {
+
+  /**
+   * Request midi object.
+   */
+  async initMIDIAccess () {
+    try {
+      if (!navigator.requestMIDIAccess) {
+        throw new Error('No MIDI support in browser!');
+      }
+      return await navigator.requestMIDIAccess();
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  /**
+   * Init MIDI loop and assign handler for messages.
+   */
+  initMIDILoop (midi) {
+    try {
+      const inputs = midi.inputs.values();
+      // const outputs = midi.outputs.values();
+
+      for (const input = inputs.next();
+          input && !input.done;
+          input = inputs.next()) {
+        input.value.onmidimessage = this.onMIDIMessage;
+      }
+    } catch (e) {
+      this.error(e);
+    }
+  }
+
+  /**
+   * Handler for MIDI messages.
+   */
+  onMIDIMessage (message) {
     // message.data[2] -> keydown / up
     console.log(message.data[2]);
-    tone.innerHTML = parseInt(message.data[1]);
+    this.dom.tone.innerHTML = parseInt(message.data[1]);
+  }
+
+  /**
+   * Handle an error in a nice way :)
+   */
+  error (e) {
+    console.log('Oh no!, Error!');
+    console.log(e);
   }
 }
- 
-function failure () {
-  console.error('No access bitchboi')
-}
 
-
+// Start the app
+new App();
