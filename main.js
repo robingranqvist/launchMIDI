@@ -10,12 +10,22 @@ class App {
       tone: document.getElementById('tone')
     };
 
-    // Setup MIDI object
-    const midi = this.initMIDIAccess();
-
-    // Iff success, start MIDI loop
-    if (midi) {
-      this.initMIDILoop(midi);
+    this.midi = null;
+  }
+  
+  /**
+   * Initializes midi
+   */
+  async initMIDI () {
+    try {
+      this.midi = await this.initMIDIAccess();
+      console.log(this.midi);
+      // If success, start MIDI loop
+      if (this.midi) {
+        this.initMIDILoop();
+      }
+    } catch (e) {
+      this.error(e);
     }
   }
 
@@ -36,18 +46,20 @@ class App {
   /**
    * Init MIDI loop and assign handler for messages.
    */
-  initMIDILoop (midi) {
+  initMIDILoop () {
     try {
-      const inputs = midi.inputs.values();
+      const inputs = this.midi.inputs.values();
       // const outputs = midi.outputs.values();
 
-      for (const input = inputs.next();
+      for (let input = inputs.next();
           input && !input.done;
           input = inputs.next()) {
-        input.value.onmidimessage = this.onMIDIMessage;
+        input.value.onmidimessage = (message) => {
+          this.onMIDIMessage(message);
+        };
       }
     } catch (e) {
-      this.error(e);
+      throw e;
     }
   }
 
@@ -57,6 +69,7 @@ class App {
   onMIDIMessage (message) {
     // message.data[2] -> keydown / up
     console.log(message.data[2]);
+    console.log(this.dom);
     this.dom.tone.innerHTML = parseInt(message.data[1]);
   }
 
@@ -69,5 +82,12 @@ class App {
   }
 }
 
-// Start the app
-new App();
+(async () => {
+  try {
+    // Start the app
+    const app = new App();
+    await app.initMIDI();
+  } catch (e) { 
+    console.log("YOU'RE FUCKED!", e);
+  }
+})();
