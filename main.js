@@ -67,10 +67,36 @@ class App {
    * Handler for MIDI messages.
    */
   onMIDIMessage (message) {
-    // message.data[2] -> keydown / up
-    console.log(message.data[2]);
-    console.log(this.dom);
-    this.dom.tone.innerHTML = parseInt(message.data[1]);
+    // Parse MIDI message data
+    const [ command, note, velocity ] = message.data;
+
+    switch (command) {
+      // Note on
+      case 144:
+          if (velocity > 0) {
+            this.noteOn(note);
+          } else {
+            this.noteOff(note);
+          }
+        break;
+
+      // Note off
+      case 128:
+          this.noteOff(note);
+        break;
+
+      // Unknown command
+      default:
+        this.error(new Error('Unknown MIDI input command: ', command, e));
+    }
+  }
+
+  noteOn (note) {
+    this.dom.tone.innerHTML = 'Note ON: ' + parseInt(note);
+  }
+
+  noteOff (note) {
+    this.dom.tone.innerHTML = 'Note OFF: ' + parseInt(note);
   }
 
   /**
